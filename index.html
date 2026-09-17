@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>额度管家</title>
+<style>
+:root{
+  --bg:#EFF2F7;
+  --surface:#FFFFFF;
+  --surface-2:#F5F7FB;
+  --line:#E7EBF2;
+  --ink:#0F1720;
+  --ink-2:#57626F;
+  --muted:#909AA8;
+  --accent:#2E5BFF;
+  --accent-soft:#EAF0FF;
+  --up:#E0453C;
+  --down:#0E9066;
+  --shadow:0 1px 2px rgba(16,24,40,.05),0 8px 20px rgba(16,24,40,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0C0F14; --surface:#161A21; --surface-2:#1D222B; --line:#272E39;
+    --ink:#E7ECF3; --ink-2:#A6B0BE; --muted:#6D7887; --accent:#7C99FF;
+    --accent-soft:#1B2540; --up:#F0655C; --down:#3BC492;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0C0F14; --surface:#161A21; --surface-2:#1D222B; --line:#272E39;
+  --ink:#E7ECF3; --ink-2:#A6B0BE; --muted:#6D7887; --accent:#7C99FF;
+  --accent-soft:#1B2540; --up:#F0655C; --down:#3BC492;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;
+}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+.wrap{max-width:600px;margin:0 auto;padding-bottom:36px}
+
+/* header */
+.topbar{
+  background:var(--surface);padding:14px 16px 12px;
+  border-bottom:1px solid var(--line);
+  position:sticky;top:0;z-index:40;
+}
+.toprow{display:flex;align-items:center;gap:10px}
+.back{background:none;border:0;color:var(--ink-2);font-size:20px;padding:2px 4px;cursor:pointer;line-height:1}
+.toprow h1{flex:1;margin:0;font-size:17px;font-weight:600;text-align:center;padding-right:24px}
+
+/* dropdown filter bar */
+.filterbar{
+  display:flex;background:var(--surface);border-bottom:1px solid var(--line);
+  position:sticky;top:53px;z-index:39;
+}
+.filterbtn{
+  flex:1;border:0;background:none;font:inherit;color:var(--ink-2);
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  padding:12px 4px;font-size:13.5px;cursor:pointer;white-space:nowrap;
+}
+.filterbtn .car{font-size:10px;transition:transform .15s;opacity:.6}
+.filterbtn[aria-expanded="true"]{color:var(--accent);font-weight:600}
+.filterbtn[aria-expanded="true"] .car{transform:rotate(180deg);opacity:1}
+.filterbtn[data-active="true"]{color:var(--accent);font-weight:600}
+
+.panel{background:var(--surface);border-bottom:1px solid var(--line);padding:14px 16px 16px;display:none;max-height:62vh;overflow-y:auto}
+.panel[data-open="true"]{display:block}
+.panel-group + .panel-group{margin-top:16px}
+.panel-label{font-size:12px;color:var(--muted);margin:0 0 8px}
+.panel-chips{display:flex;flex-wrap:wrap;gap:8px}
+.pchip{
+  border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);
+  font:inherit;font-size:13px;padding:7px 14px;border-radius:8px;cursor:pointer;
+}
+.pchip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.panel-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:14px}
+.panel-foot button{font:inherit;font-size:13px;border-radius:8px;padding:8px 16px;cursor:pointer;border:1px solid var(--line);background:var(--surface)}
+.panel-foot .apply{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.panel-foot .reset{color:var(--muted)}
+
+/* region list with explanations */
+.region-row{padding:9px 0;border-bottom:1px solid var(--line)}
+.region-row:last-child{border-bottom:0}
+.region-toggle{
+  display:flex;align-items:center;gap:9px;cursor:pointer;background:none;border:0;padding:0;width:100%;text-align:left;
+}
+.region-toggle .box{
+  width:18px;height:18px;border:1.5px solid var(--line);border-radius:5px;flex:0 0 auto;
+  display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:transparent;background:var(--surface);
+}
+.region-toggle[aria-pressed="true"] .box{background:var(--accent);border-color:var(--accent);color:#fff}
+.region-toggle .name{font-size:14.5px;font-weight:600;color:var(--ink)}
+.region-desc{margin:4px 0 0 27px;font-size:12px;color:var(--muted);line-height:1.55}
+
+.activepills{
+  display:flex;gap:8px;overflow-x:auto;padding:10px 16px;
+  scrollbar-width:none;background:var(--surface);border-bottom:1px solid var(--line);
+}
+.activepills::-webkit-scrollbar{display:none}
+.activepills:empty{display:none}
+.pill{
+  flex:0 0 auto;display:flex;align-items:center;gap:5px;
+  background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent);
+  font-size:12.5px;padding:5px 8px 5px 11px;border-radius:999px;white-space:nowrap;
+}
+.pill button{border:0;background:none;color:var(--accent);font-size:13px;cursor:pointer;padding:0;line-height:1}
+.pill.clearall{background:var(--surface-2);color:var(--muted);border-color:var(--line)}
+.pill.clearall button{color:inherit}
+
+.scopebar{
+  display:flex;justify-content:space-between;padding:12px 16px 6px;
+  color:var(--muted);font-size:12.5px;
+}
+.scopebar strong{color:var(--ink-2)}
+
+/* table */
+.card{background:var(--surface);margin:0;border-top:1px solid var(--line)}
+.scroller{
+  overflow:auto;-webkit-overflow-scrolling:touch;
+  max-height:min(64vh, 560px);
+}
+table{border-collapse:collapse;width:100%;min-width:460px}
+thead th{
+  position:sticky;top:0;z-index:5;background:var(--surface-2);
+  color:var(--ink-2);font-size:12.5px;font-weight:600;
+  text-align:right;padding:10px 12px;white-space:nowrap;
+  border-bottom:1px solid var(--line);cursor:pointer;user-select:none;
+}
+thead th:first-child{text-align:left;cursor:default;padding-left:16px}
+thead th .arrow{display:inline-block;margin-left:3px;opacity:.3;font-size:10px}
+thead th[data-active="true"]{color:var(--accent)}
+thead th[data-active="true"] .arrow{opacity:1}
+tbody td{padding:13px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+tbody td:first-child{text-align:left;padding-left:16px;white-space:normal}
+tbody tr:last-child td{border-bottom:0}
+tbody tr[data-picked="true"]{background:var(--accent-soft)}
+.fname{font-size:14px;line-height:1.35;display:block}
+.fmeta{display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap}
+.fcode{color:var(--muted);font-size:12px}
+.tag{font-size:11px;padding:1px 6px;border-radius:4px;background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line)}
+.tag.region{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.limit{font-size:15px;font-weight:600}
+.limit.tight{color:var(--muted);font-weight:500}
+.perf{font-weight:600}
+.perf.up{color:var(--up)}
+.perf.down{color:var(--down)}
+.perf.neutral{color:var(--ink-2)}
+.add{
+  width:26px;height:26px;border-radius:7px;border:1px solid var(--accent);
+  background:transparent;color:var(--accent);font-size:16px;line-height:1;
+  cursor:pointer;display:inline-flex;align-items:center;justify-content:center;
+}
+.add[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+.empty{padding:56px 16px;text-align:center;color:var(--muted);font-size:14px}
+.empty button{margin-top:12px;border:1px solid var(--line);background:var(--surface);color:var(--accent);font:inherit;font-size:13px;padding:7px 16px;border-radius:999px;cursor:pointer}
+
+.note{padding:16px;color:var(--muted);font-size:12px;line-height:1.7}
+
+/* basket */
+.basket{
+  position:fixed;left:0;right:0;bottom:0;z-index:50;
+  background:var(--surface);border-top:1px solid var(--line);
+  box-shadow:0 -6px 24px rgba(16,24,40,.08);
+  padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+  transform:translateY(110%);transition:transform .22s ease;
+}
+.basket[data-open="true"]{transform:translateY(0)}
+.basket-inner{max-width:600px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.basket .label{font-size:12.5px;color:var(--muted)}
+.basket .total{font-size:19px;font-weight:700;letter-spacing:-.01em}
+.basket .go{margin-left:auto;border:0;background:var(--accent);color:#fff;font:inherit;font-weight:600;padding:11px 20px;border-radius:10px;cursor:pointer}
+.basket .clear{border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px;cursor:pointer;padding:6px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar">
+    <div class="toprow">
+      <button class="back" aria-label="返回">‹</button>
+      <h1>额度管家</h1>
+    </div>
+  </header>
+
+  <nav class="filterbar" id="filterbar"></nav>
+  <div class="panel" id="panel"></div>
+  <div class="activepills" id="pills"></div>
+
+  <p class="scopebar">
+    <span>共 <strong id="count" class="num">0</strong> 只可买</span>
+    <span>点表头可排序 →</span>
+  </p>
+
+  <section class="card">
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">基金 / 代码</th>
+            <th scope="col" data-sort="limit">单日限额<span class="arrow">▾</span></th>
+            <th scope="col" data-sort="perf" id="perfHead">近1年涨跌幅<span class="arrow">▾</span></th>
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="empty" hidden>
+      这些条件下没有可买的基金
+      <br><button id="resetAll">清空全部筛选</button>
+    </div>
+  </section>
+
+  <p class="note">演示数据，非实时额度，不构成投资建议。基金额度每日变动，实际以申购当日基金公司公告为准；涨跌幅、最大回撤、波动率均为模拟演示数据。</p>
+</div>
+
+<div class="basket" id="basket" data-open="false">
+  <div class="basket-inner">
+    <div>
+      <div class="label">已选 <span id="pickCount" class="num">0</span> 只，单日最多可投</div>
+      <div class="total num" id="pickTotal">¥0</div>
+    </div>
+    <button class="clear" id="clear">清空</button>
+    <button class="go" id="go">生成申购计划</button>
+  </div>
+</div>
+
+<script>
+/* ---------- taxonomy ---------- */
+const LIMIT_BANDS = [
+  {key:'lt100',name:'100元以下',   test:n=>n<100},
+  {key:'b1',   name:'100~1000元',  test:n=>n>=100&&n<1000},
+  {key:'b2',   name:'1000~1万元',  test:n=>n>=1000&&n<10000},
+  {key:'b3',   name:'1万元以上',   test:n=>n>=10000},
+];
+const TYPES = [
+  {key:'overseas',  name:'海外基金'},
+  {key:'active',    name:'主动基金'},
+  {key:'bond',      name:'债券基金'},
+  {key:'commodity', name:'商品基金'},
+  {key:'index',     name:'指数基金'},
+];
+const REGIONS = [
+  {key:'cn',    name:'中国大陆', desc:'主要投资于境内A股、银行间债券等人民币资产的基金，含境内主动、指数、债券基金等。'},
+  {key:'hk',    name:'中国香港', desc:'主要投资于港股市场，含在港上市的内地企业（如恒生指数、恒生科技类基金）。'},
+  {key:'us',    name:'美国',    desc:'主要投资于美国市场，含纳斯达克、标普500、道琼斯等美股指数与个股。'},
+  {key:'apac',  name:'亚太',    desc:'投资于亚太多个市场的区域型基金（不含中国内地、香港、日本单一市场集中配置）。'},
+  {key:'jp',    name:'日本',    desc:'主要投资于日本市场，如日经225、TOPIX相关基金。'},
+  {key:'in',    name:'印度',    desc:'主要投资于印度市场。'},
+  {key:'vn',    name:'越南',    desc:'主要投资于越南市场。'},
+  {key:'eu',    name:'欧洲',    desc:'投资于欧洲多国市场的区域型基金（不含德国、法国、英国单一国别集中型产品）。'},
+  {key:'de',    name:'德国',    desc:'主要投资于德国市场，如DAX30相关基金。'},
+  {key:'fr',    name:'法国',    desc:'主要投资于法国市场，如CAC40相关基金。'},
+  {key:'uk',    name:'英国',    desc:'主要投资于英国市场，如富时100相关基金。'},
+  {key:'global',name:'全球',    desc:'投资范围覆盖三个及以上地区、不以单一市场为主的全球配置型基金。'},
+];
+
+const PERIODS = [
+  {key:'1m',   name:'近1月',   years:1/12},
+  {key:'3m',   name:'近3月',   years:0.25},
+  {key:'6m',   name:'近6月',   years:0.5},
+  {key:'1y',   name:'近1年',   years:1},
+  {key:'3y',   name:'近3年',   years:3},
+  {key:'since',name:'成立以来', years:4.5},
+];
+const METRICS = [
+  {key:'ret', name:'涨跌幅',   defaultDir:'desc', colored:true},
+  {key:'mdd', name:'最大回撤', defaultDir:'desc', colored:false},
+  {key:'vol', name:'波动率',   defaultDir:'asc',  colored:false},
+];
+
+const LIMIT_NAME = Object.fromEntries(LIMIT_BANDS.map(b=>[b.key,b.name]));
+const TYPE_NAME = Object.fromEntries(TYPES.map(t=>[t.key,t.name]));
+const REGION_NAME = Object.fromEntries(REGIONS.map(r=>[r.key,r.name]));
+const PERIOD_NAME = Object.fromEntries(PERIODS.map(p=>[p.key,p.name]));
+const METRIC_NAME = Object.fromEntries(METRICS.map(m=>[m.key,m.name]));
+const METRIC_CFG = Object.fromEntries(METRICS.map(m=>[m.key,m]));
+
+/* ---------- funds ----------
+   types: array — a fund may carry more than one tag at once
+   (e.g. a QDII index fund is both 海外基金 and 指数基金).
+   ret1y is the anchor annual return; risk drives drawdown/vol magnitude. */
+const FUNDS = [
+  {name:'易方达标普500指数(QDII-LOF)A',   code:'161125', region:'us',    types:['overseas','index'],   limit:30000, ret1y:14.02, risk:16},
+  {name:'汇添富纳斯达克100指数(QDII)A',    code:'018966', region:'us',    types:['overseas','index'],   limit:50000, ret1y:16.93, risk:22},
+  {name:'长城全球新能源汽车股票(QDII)C',   code:'009250', region:'global',types:['overseas','active'],  limit:10000, ret1y:41.71, risk:32},
+  {name:'广发全球精选股票(QDII)C',         code:'270023', region:'global',types:['overseas','active'],  limit:10000, ret1y:36.06, risk:20},
+  {name:'易方达全球优质企业混合(QDII)C',   code:'004573', region:'global',types:['overseas','active'],  limit:10000, ret1y:12.44, risk:18},
+  {name:'华夏恒生科技ETF联接(QDII)A',      code:'013402', region:'hk',    types:['overseas','index'],   limit:8000,  ret1y:24.51, risk:28},
+  {name:'易方达黄金主题(QDII)A',           code:'161116', region:'other', types:['overseas','commodity'],limit:5000, ret1y:31.04, risk:14},
+  {name:'工银瑞信全球美元债(QDII)A',       code:'003385', region:'global',types:['overseas','bond'],    limit:3000,  ret1y:5.12,  risk:6},
+  {name:'广发道琼斯石油指数(QDII-LOF)A',   code:'162719', region:'us',    types:['overseas','commodity'],limit:3000, ret1y:-4.37, risk:30},
+  {name:'南方原油(QDII-LOF)A',             code:'501018', region:'us',    types:['overseas','commodity'],limit:2000, ret1y:-8.10, risk:29},
+  {name:'天弘纳斯达克100指数(QDII)A',      code:'018043', region:'us',    types:['overseas','index'],   limit:1000,  ret1y:18.77, risk:22},
+  {name:'天弘纳斯达克100指数(QDII)C',      code:'018044', region:'us',    types:['overseas','index'],   limit:1000,  ret1y:18.54, risk:22},
+  {name:'华夏野村日经225ETF联接(QDII)A',   code:'017641', region:'jp',    types:['overseas','index'],   limit:1000,  ret1y:9.44,  risk:17},
+  {name:'华安德国DAX30ETF联接(QDII)A',     code:'000614', region:'de',    types:['overseas','index'],   limit:500,   ret1y:11.26, risk:19},
+  {name:'国泰纳斯达克100指数(QDII)',       code:'160213', region:'us',    types:['overseas','index'],   limit:500,   ret1y:19.82, risk:22},
+  {name:'富国蓝筹精选股票(QDII)',          code:'100060', region:'us',    types:['overseas','active'],  limit:500,   ret1y:21.35, risk:20},
+  {name:'工银瑞信印度市场基金(QDII)',      code:'164824', region:'in',    types:['overseas','active'],  limit:300,   ret1y:2.18,  risk:24},
+  {name:'汇添富香港优势精选(QDII)',        code:'000513', region:'hk',    types:['overseas','active'],  limit:300,   ret1y:22.07, risk:21},
+  {name:'大成纳斯达克100指数(QDII)A',      code:'000834', region:'us',    types:['overseas','index'],   limit:100,   ret1y:18.24, risk:22},
+  {name:'华安纳斯达克100ETF联接(QDII)A',   code:'014978', region:'us',    types:['overseas','index'],   limit:100,   ret1y:18.38, risk:22},
+  {name:'华夏海外聚享债券(QDII)C',         code:'004257', region:'global',types:['overseas','bond'],    limit:100,   ret1y:4.63,  risk:6},
+  {name:'嘉实美国成长股票(QDII)人民币',    code:'000043', region:'us',    types:['overseas','active'],  limit:10,    ret1y:20.44, risk:23},
+  {name:'华泰柏瑞亚洲企业(QDII)',          code:'460010', region:'apac',  types:['overseas','active'],  limit:10,    ret1y:13.09, risk:19},
+  {name:'易方达中概互联50ETF联接(QDII)A',  code:'006327', region:'hk',    types:['overseas','index'],   limit:1,     ret1y:27.83, risk:29},
+
+  {name:'易方达蓝筹精选混合A',             code:'005827', region:'cn',    types:['active'],             limit:20000, ret1y:18.50, risk:18},
+  {name:'中欧医疗健康混合A',               code:'003095', region:'cn',    types:['active'],             limit:10000, ret1y:9.20,  risk:17},
+  {name:'华夏上证50ETF联接A',              code:'001548', region:'cn',    types:['index'],              limit:50000, ret1y:8.40,  risk:14},
+  {name:'易方达科创板50ETF联接A',          code:'011608', region:'cn',    types:['index'],              limit:1000,  ret1y:22.10, risk:26},
+  {name:'招商中证白酒指数A',               code:'161725', region:'cn',    types:['index'],              limit:5000,  ret1y:-2.30, risk:24},
+  {name:'广发纯债债券A',                   code:'270048', region:'cn',    types:['bond'],               limit:30000, ret1y:3.80,  risk:4},
+  {name:'易方达信用债债券A',               code:'110017', region:'cn',    types:['bond'],               limit:10000, ret1y:3.20,  risk:3},
+  {name:'华安黄金易ETF联接A',              code:'000216', region:'other', types:['commodity'],          limit:50000, ret1y:26.50, risk:13},
+];
+
+/* ---------- deterministic pseudo-random metric generator (demo data only) ---------- */
+function hashStr(s){let h=0;for(let i=0;i<s.length;i++){h=(h<<5)-h+s.charCodeAt(i);h|=0;}return h;}
+function mulberry32(seed){
+  return function(){
+    seed|=0; seed=seed+0x6D2B79F5|0;
+    let t=Math.imul(seed^seed>>>15,1|seed);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+const PERIOD_SCALE = {'1m':0.35,'3m':0.55,'6m':0.75,'1y':1,'3y':1.35,'since':1.6};
+
+function metricValue(f, periodKey, metricKey){
+  const rng = mulberry32(hashStr(f.code+periodKey+metricKey));
+  const years = PERIODS.find(p=>p.key===periodKey).years;
+  if(metricKey==='ret'){
+    const annual = f.ret1y/100;
+    const compounded = Math.pow(1+annual, years)-1;
+    const noise = (rng()-0.5)*0.35;
+    return compounded*100*(1+noise);
+  }
+  if(metricKey==='mdd'){
+    const scale = PERIOD_SCALE[periodKey];
+    return -(f.risk*scale)*(0.8+rng()*0.35);
+  }
+  if(metricKey==='vol'){
+    return (f.risk*0.82)*(0.88+rng()*0.24);
+  }
+  return 0;
+}
+
+/* ---------- state ---------- */
+const state = {
+  limitBands:new Set(), regions:new Set(), types:new Set(),
+  sortKey:'limit', sortDir:'desc',
+  period:'1y', metric:'ret',
+  openPanel:null, picked:new Set(),
+};
+
+const fmtMoney = n => n>=10000 ? '¥'+(n/10000).toFixed(n%10000?1:0)+'万' : '¥'+n.toLocaleString('zh-CN');
+
+function passFilters(f){
+  if(f.limit>50000) return false;
+  if(state.limitBands.size && ![...state.limitBands].some(k=>LIMIT_BANDS.find(b=>b.key===k).test(f.limit))) return false;
+  if(state.regions.size && !state.regions.has(f.region)) return false;
+  if(state.types.size && !f.types.some(t=>state.types.has(t))) return false;
+  return true;
+}
+function visible(){
+  return FUNDS.filter(passFilters).sort((a,b)=>{
+    const d = state.sortDir==='desc'?-1:1;
+    if(state.sortKey==='limit'){
+      if(a.limit===b.limit) return 0;
+      return (a.limit-b.limit)*d;
+    }
+    const va=metricValue(a,state.period,state.metric), vb=metricValue(b,state.period,state.metric);
+    if(va===vb) return b.limit-a.limit;
+    return (va-vb)*d;
+  });
+}
+
+/* ---------- filter bar ---------- */
+function renderFilterBar(){
+  const bar=document.getElementById('filterbar');
+  bar.innerHTML='';
+  const sortActive = !(state.sortKey==='limit' && state.sortDir==='desc');
+  const defs=[
+    {key:'type', label: state.types.size ? `类型(${state.types.size})` : '类型', active: state.types.size>0},
+    {key:'limit', label: state.limitBands.size ? `限额(${state.limitBands.size})` : '限额', active: state.limitBands.size>0},
+    {key:'region', label: state.regions.size ? `地区(${state.regions.size})` : '地区', active: state.regions.size>0},
+    {key:'sort', label: sortActive ? PERIOD_NAME[state.period]+METRIC_NAME[state.metric] : '排序', active: sortActive},
+  ];
+  defs.forEach(def=>{
+    const btn=document.createElement('button');
+    btn.className='filterbtn';
+    btn.setAttribute('aria-expanded', state.openPanel===def.key);
+    btn.dataset.active=def.active;
+    btn.innerHTML = `<span>${def.label}</span><span class="car">▾</span>`;
+    btn.onclick=()=>{ state.openPanel = state.openPanel===def.key ? null : def.key; render(); };
+    bar.appendChild(btn);
+  });
+}
+
+function chipRow(container, items, isSelected, onToggle){
+  const row=document.createElement('div');
+  row.className='panel-chips';
+  items.forEach(it=>{
+    const c=document.createElement('button');
+    c.className='pchip'; c.textContent=it.name;
+    c.setAttribute('aria-pressed', isSelected(it));
+    c.onclick=()=>onToggle(it);
+    row.appendChild(c);
+  });
+  container.appendChild(row);
+}
+
+function multiSelectFoot(panel, clearFn){
+  const foot=document.createElement('div'); foot.className='panel-foot';
+  foot.innerHTML='<button class="reset" id="pReset">清空</button><button class="apply" id="pApply">确定</button>';
+  panel.appendChild(foot);
+  foot.querySelector('#pReset').onclick=()=>{ clearFn(); render(); };
+  foot.querySelector('#pApply').onclick=()=>{ state.openPanel=null; render(); };
+}
+
+function renderPanel(){
+  const panel=document.getElementById('panel');
+  if(!state.openPanel){ panel.dataset.open=false; panel.innerHTML=''; return; }
+  panel.dataset.open=true;
+  panel.innerHTML='';
+
+  if(state.openPanel==='limit'){
+    const g=document.createElement('div'); g.className='panel-group';
+    g.innerHTML='<p class="panel-label">单日限额（可多选）</p>';
+    panel.appendChild(g);
+    chipRow(g, LIMIT_BANDS, it=>state.limitBands.has(it.key), it=>{
+      state.limitBands.has(it.key)?state.limitBands.delete(it.key):state.limitBands.add(it.key);
+      renderPanel(); renderFilterBar(); renderPills();
+    });
+    multiSelectFoot(panel, ()=>state.limitBands.clear());
+  }
+
+  if(state.openPanel==='region'){
+    const g=document.createElement('div'); g.className='panel-group';
+    g.innerHTML='<p class="panel-label">投资地区（可多选，含范围说明）</p>';
+    panel.appendChild(g);
+    REGIONS.forEach(r=>{
+      const row=document.createElement('div'); row.className='region-row';
+      const btn=document.createElement('button');
+      btn.className='region-toggle';
+      btn.setAttribute('aria-pressed', state.regions.has(r.key));
+      btn.innerHTML=`<span class="box">✓</span><span class="name">${r.name}</span>`;
+      btn.onclick=()=>{
+        state.regions.has(r.key)?state.regions.delete(r.key):state.regions.add(r.key);
+        renderPanel(); renderFilterBar(); renderPills();
+      };
+      const desc=document.createElement('p'); desc.className='region-desc'; desc.textContent=r.desc;
+      row.appendChild(btn); row.appendChild(desc);
+      g.appendChild(row);
+    });
+    multiSelectFoot(panel, ()=>state.regions.clear());
+  }
+
+  if(state.openPanel==='type'){
+    const g=document.createElement('div'); g.className='panel-group';
+    g.innerHTML='<p class="panel-label">基金类型（可多选）</p>';
+    panel.appendChild(g);
+    chipRow(g, TYPES, it=>state.types.has(it.key), it=>{
+      state.types.has(it.key)?state.types.delete(it.key):state.types.add(it.key);
+      renderPanel(); renderFilterBar(); renderPills();
+    });
+    multiSelectFoot(panel, ()=>state.types.clear());
+  }
+
+  if(state.openPanel==='sort'){
+    const g0=document.createElement('div'); g0.className='panel-group';
+    g0.innerHTML='<p class="panel-label">综合</p>';
+    panel.appendChild(g0);
+    chipRow(g0, [{key:'comprehensive',name:'按限额综合排序'}],
+      ()=> state.sortKey==='limit' && state.sortDir==='desc',
+      ()=>{ state.sortKey='limit'; state.sortDir='desc'; render(); });
+
+    const g1=document.createElement('div'); g1.className='panel-group';
+    g1.innerHTML='<p class="panel-label">时间</p>';
+    panel.appendChild(g1);
+    chipRow(g1, PERIODS, it=>state.period===it.key, it=>{
+      state.period=it.key; state.sortKey='perf'; state.sortDir=METRIC_CFG[state.metric].defaultDir;
+      renderPanel(); renderFilterBar();
+    });
+
+    const g2=document.createElement('div'); g2.className='panel-group';
+    g2.innerHTML='<p class="panel-label">指标</p>';
+    panel.appendChild(g2);
+    chipRow(g2, METRICS, it=>state.metric===it.key, it=>{
+      state.metric=it.key; state.sortKey='perf'; state.sortDir=it.defaultDir;
+      state.openPanel=null; render();
+    });
+  }
+}
+
+function renderPills(){
+  const wrap=document.getElementById('pills');
+  wrap.innerHTML='';
+  const pills=[];
+  state.limitBands.forEach(k=>pills.push({label:LIMIT_NAME[k], clear:()=>state.limitBands.delete(k)}));
+  state.regions.forEach(k=>pills.push({label:REGION_NAME[k], clear:()=>state.regions.delete(k)}));
+  state.types.forEach(k=>pills.push({label:TYPE_NAME[k], clear:()=>state.types.delete(k)}));
+  if(!pills.length) return;
+  pills.forEach(p=>{
+    const el=document.createElement('span'); el.className='pill';
+    el.innerHTML=`<span>${p.label}</span>`;
+    const x=document.createElement('button'); x.textContent='✕'; x.setAttribute('aria-label','移除 '+p.label);
+    x.onclick=()=>{ p.clear(); render(); };
+    el.appendChild(x); wrap.appendChild(el);
+  });
+  if(pills.length>1){
+    const clr=document.createElement('span'); clr.className='pill clearall';
+    clr.innerHTML='<button>清空全部</button>';
+    clr.querySelector('button').onclick=()=>{ state.limitBands.clear(); state.regions.clear(); state.types.clear(); render(); };
+    wrap.appendChild(clr);
+  }
+}
+
+function renderHead(){
+  document.getElementById('perfHead').innerHTML = PERIOD_NAME[state.period]+METRIC_NAME[state.metric]+'<span class="arrow">▾</span>';
+  document.querySelectorAll('th[data-sort]').forEach(th=>{
+    const active = th.dataset.sort===state.sortKey;
+    th.dataset.active=active;
+    th.querySelector('.arrow').textContent = active && state.sortDir==='asc' ? '▴' : '▾';
+    th.onclick=()=>{
+      if(state.sortKey===th.dataset.sort){ state.sortDir = state.sortDir==='desc'?'asc':'desc'; }
+      else {
+        state.sortKey=th.dataset.sort;
+        state.sortDir = th.dataset.sort==='perf' ? METRIC_CFG[state.metric].defaultDir : 'desc';
+      }
+      render();
+    };
+  });
+}
+
+function renderRows(){
+  const list=visible();
+  const tbody=document.getElementById('rows');
+  tbody.innerHTML='';
+  const mCfg = METRIC_CFG[state.metric];
+  list.forEach(f=>{
+    const tr=document.createElement('tr');
+    tr.dataset.picked = state.picked.has(f.code);
+    const tight = f.limit<=100;
+    const pv = metricValue(f, state.period, state.metric);
+    let perfClass='neutral';
+    if(mCfg.colored) perfClass = pv>=0 ? 'up':'down';
+    const sign = (state.metric!=='vol' && pv>=0) ? '+' : '';
+    const typeTags = f.types.map(t=>`<span class="tag">${TYPE_NAME[t]}</span>`).join('');
+    tr.innerHTML = `
+      <td>
+        <span class="fname">${f.name}</span>
+        <span class="fmeta"><span class="fcode num">${f.code}</span><span class="tag region">${REGION_NAME[f.region] || '其他'}</span>${typeTags}</span>
+      </td>
+      <td><span class="limit num ${tight?'tight':''}">${fmtMoney(f.limit)}</span></td>
+      <td><span class="perf num ${perfClass}">${sign}${pv.toFixed(2)}%</span></td>
+      <td></td>`;
+    const btn=document.createElement('button');
+    btn.className='add';
+    btn.setAttribute('aria-pressed', state.picked.has(f.code));
+    btn.setAttribute('aria-label', (state.picked.has(f.code)?'移出':'加入')+'组合：'+f.name);
+    btn.textContent = state.picked.has(f.code)?'✓':'+';
+    btn.onclick=()=>{ state.picked.has(f.code)?state.picked.delete(f.code):state.picked.add(f.code); renderRows(); renderBasket(); };
+    tr.lastElementChild.appendChild(btn);
+    tbody.appendChild(tr);
+  });
+  document.getElementById('empty').hidden = list.length>0;
+  document.getElementById('count').textContent = list.length;
+}
+
+function renderBasket(){
+  const picked=FUNDS.filter(f=>state.picked.has(f.code));
+  const total=picked.reduce((s,f)=>s+f.limit,0);
+  document.getElementById('basket').dataset.open = picked.length>0;
+  document.getElementById('pickCount').textContent=picked.length;
+  document.getElementById('pickTotal').textContent=fmtMoney(total);
+}
+
+function render(){ renderFilterBar(); renderPanel(); renderPills(); renderHead(); renderRows(); renderBasket(); }
+
+document.getElementById('resetAll').onclick=()=>{
+  state.limitBands.clear(); state.regions.clear(); state.types.clear();
+  state.sortKey='limit'; state.sortDir='desc'; state.period='1y'; state.metric='ret'; state.openPanel=null;
+  render();
+};
+document.getElementById('clear').onclick=()=>{ state.picked.clear(); renderRows(); renderBasket(); };
+document.getElementById('go').onclick=()=>{
+  const picked=FUNDS.filter(f=>state.picked.has(f.code));
+  const total=picked.reduce((s,f)=>s+f.limit,0);
+  alert('申购计划\n\n'+picked.map(f=>`${f.name}（${f.code}）  ${fmtMoney(f.limit)}`).join('\n')+`\n\n合计单日 ${fmtMoney(total)}`);
+};
+
+render();
+</script>
+</body>
+</html>
