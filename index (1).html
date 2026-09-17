@@ -278,9 +278,8 @@ const METRICS = [
   {key:'mdd', name:'最大回撤', defaultDir:'desc', colored:false},
   {key:'vol', name:'波动率',   defaultDir:'asc',  colored:false},
 ];
-
-const LIMIT_NAME = Object.fromEntries(LIMIT_BANDS.map(b=>[b.key,b.name]));
 const TYPE_NAME = Object.fromEntries(TYPES.map(t=>[t.key,t.name]));
+const LIMIT_NAME = Object.fromEntries(LIMIT_BANDS.map(b=>[b.key,b.name]));
 const REGION_NAME = Object.fromEntries(REGIONS.map(r=>[r.key,r.name]));
 const PERIOD_NAME = Object.fromEntries(PERIODS.map(p=>[p.key,p.name]));
 const METRIC_NAME = Object.fromEntries(METRICS.map(m=>[m.key,m.name]));
